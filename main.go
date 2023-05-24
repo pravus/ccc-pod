@@ -32,24 +32,24 @@ type Spec struct {
 }
 
 type Flags struct {
-	D      *bool
-	F      *string
-	I      *bool
-	Driver *string
-	Show   *bool
-	Start  *bool
-	Stop   *bool
+	Detach      *bool
+	Driver      *string
+	File        *string
+	Interactive *bool
+	Show        *bool
+	Start       *bool
+	Stop        *bool
 }
 
 func main() {
 	flags := Flags{
-		D:      flag.Bool(`d`, false, `detach`),
-		F:      flag.String(`f`, ``, `path to the yaml arg file`),
-		I:      flag.Bool(`i`, false, `enables interactive mode`),
-		Driver: flag.String(`driver`, ``, `path to driver`),
-		Show:   flag.Bool(`show`, false, `shows the command to be run`),
-		Start:  flag.Bool(`start`, false, `start the pod`),
-		Stop:   flag.Bool(`stop`, false, `stop the pod`),
+		Detach:      flag.Bool(`d`, false, `detach from the terminal`),
+		Driver:      flag.String(`driver`, ``, `path to driver`),
+		File:        flag.String(`f`, ``, `path to the yaml arg file`),
+		Interactive: flag.Bool(`i`, false, `enables interactive mode`),
+		Show:        flag.Bool(`show`, false, `shows the command to be run`),
+		Start:       flag.Bool(`start`, false, `start the pod`),
+		Stop:        flag.Bool(`stop`, false, `stop the pod`),
 	}
 	flag.Parse()
 
@@ -59,8 +59,8 @@ func main() {
 	}
 
 	var spec Spec
-	if *flags.F != `` {
-		file, err := os.Open(*flags.F)
+	if *flags.File != `` {
+		file, err := os.Open(*flags.File)
 		if err != nil {
 			fatal(`%s`, err)
 		}
@@ -74,10 +74,10 @@ func main() {
 	switch {
 	case *flags.Start:
 		cmd = append(cmd, `run`)
-		if *flags.I {
+		if *flags.Interactive {
 			cmd = append(cmd, []string{`--interactive`, `--tty`}...)
 		}
-		cmd = addBool(cmd, `detach`, spec.Rm)
+		cmd = addBool(cmd, `detach`, flags.Detach)
 		cmd = addBool(cmd, `rm`, spec.Rm)
 		cmd = addBool(cmd, `replace`, spec.Replace)
 		cmd = addString(cmd, `name`, spec.Name)
