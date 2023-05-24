@@ -15,7 +15,7 @@ type Spec struct {
 	Dns        []string `json:"dns"`
 	Entrypoint *string  `json:"entrypoint"`
 	Env        []string `json:"env"`
-	EnvFile    *string  `json:"env-file"`
+	EnvFile    *string  `json:"envFile"`
 	Image      *string  `json:"image"`
 	Hostname   *string  `json:"hostname"`
 	Hosts      []string `json:"hosts"`
