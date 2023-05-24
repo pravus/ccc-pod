@@ -11,42 +11,49 @@ import (
 )
 
 type Spec struct {
-	CapAdds  []string `json:"cap-adds"`
-	Dns      []string `json:"dns"`
-	Env      []string `json:"env"`
-	EnvFile  *string  `json:"env-file"`
-	Image    *string  `json:"image"`
-	Hostname *string  `json:"hostname"`
-	Name     *string  `json:"name"`
-	Network  *string  `json:"network"`
-	Publish  []string `json:"publish"`
-	Replace  *bool    `json:"replace"`
-	Rm       *bool    `json:"rm"`
-	Volumes  []string `json:"volumes"`
+	Args       []string `json:"args"`
+	Dns        []string `json:"dns"`
+	Entrypoint *string  `json:"entrypoint"`
+	Env        []string `json:"env"`
+	EnvFile    *string  `json:"env-file"`
+	Image      *string  `json:"image"`
+	Hostname   *string  `json:"hostname"`
+	Hosts      []string `json:"hosts"`
+	Name       *string  `json:"name"`
+	Network    *string  `json:"network"`
+	Publish    []string `json:"publish"`
+	Replace    *bool    `json:"replace"`
+	Rm         *bool    `json:"rm"`
+	Volumes    []string `json:"volumes"`
+	Caps       struct {
+		Add  []string `json:"add"`
+		Drop []string `json:"drop"`
+	} `json:"caps"`
 }
 
 type Flags struct {
-	D     *string
-	F     *string
-	I     *bool
-	N     *string
-	Show  *bool
-	Start *bool
-	Stop  *bool
+	D      *bool
+	F      *string
+	I      *bool
+	Driver *string
+	Show   *bool
+	Start  *bool
+	Stop   *bool
 }
 
 func main() {
 	flags := Flags{
-		D:     flag.String(`d`, ``, `path to driver`),
-		F:     flag.String(`f`, ``, `path to the yaml arg file`),
-		I:     flag.Bool(`i`, false, `enables interactive mode`),
-		Show:  flag.Bool(`show`, false, `shows the command to be run`),
-		Start: flag.Bool(`start`, false, `start the pod`),
-		Stop:  flag.Bool(`stop`, false, `stop the pod`),
+		D:      flag.Bool(`d`, false, `detach`),
+		F:      flag.String(`f`, ``, `path to the yaml arg file`),
+		I:      flag.Bool(`i`, false, `enables interactive mode`),
+		Driver: flag.String(`driver`, ``, `path to driver`),
+		Show:   flag.Bool(`show`, false, `shows the command to be run`),
+		Start:  flag.Bool(`start`, false, `start the pod`),
+		Stop:   flag.Bool(`stop`, false, `stop the pod`),
 	}
 	flag.Parse()
 
-	driver, err := driver(*flags.D)
+	driver, err := driver(*flags.Driver)
 	if err != nil {
 		fatal(`driver: %s`, err)
 	}
@@ -68,22 +75,27 @@ func main() {
 	case *flags.Start:
 		cmd = append(cmd, `run`)
 		if *flags.I {
-			cmd = append(cmd, `-it`)
+			cmd = append(cmd, []string{`--interactive`, `--tty`}...)
 		}
+		cmd = addBool(cmd, `detach`, spec.Rm)
 		cmd = addBool(cmd, `rm`, spec.Rm)
 		cmd = addBool(cmd, `replace`, spec.Replace)
 		cmd = addString(cmd, `name`, spec.Name)
 		cmd = addString(cmd, `network`, spec.Network)
 		cmd = addString(cmd, `hostname`, spec.Hostname)
-		cmd = addSlice(cmd, `cap-add`, spec.CapAdds)
+		cmd = addSlice(cmd, `add-host`, spec.Hosts)
+		cmd = addSlice(cmd, `cap-add`, spec.Caps.Add)
+		cmd = addSlice(cmd, `cap-drop`, spec.Caps.Drop)
 		cmd = addSlice(cmd, `dns`, spec.Dns)
 		cmd = addString(cmd, `env-file`, spec.EnvFile)
 		cmd = addSlice(cmd, `env`, spec.Env)
 		cmd = addSlice(cmd, `publish`, spec.Publish)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
+		cmd = addString(cmd, `entrypoint`, spec.Entrypoint)
 		if spec.Image != nil && *spec.Image != `` {
 			cmd = append(cmd, *spec.Image)
 		}
+		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
 	case *flags.Stop:
 		cmd = append(cmd, `stop`)
