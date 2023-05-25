@@ -32,35 +32,40 @@ type Spec struct {
 }
 
 type Flags struct {
-	Detach      *bool
-	Driver      *string
-	File        *string
-	Interactive *bool
-	Show        *bool
-	Start       *bool
-	Stop        *bool
+	Bliss       bool
+	Detach      bool
+	Driver      string
+	File        string
+	Interactive bool
+	Show        bool
+	Start       bool
+	Stop        bool
+	Verbose     bool
 }
 
 func main() {
-	flags := Flags{
-		Detach:      flag.Bool(`d`, false, `detach from the terminal`),
-		Driver:      flag.String(`driver`, ``, `path to driver`),
-		File:        flag.String(`f`, ``, `path to the yaml arg file`),
-		Interactive: flag.Bool(`i`, false, `enables interactive mode`),
-		Show:        flag.Bool(`show`, false, `shows the command to be run`),
-		Start:       flag.Bool(`start`, false, `start the pod`),
-		Stop:        flag.Bool(`stop`, false, `stop the pod`),
-	}
+	flags := Flags{}
+	flag.BoolVar(&flags.Bliss, `bliss`, false, `who are you?`)
+	flag.BoolVar(&flags.Detach, `d`, false, ``)
+	flag.BoolVar(&flags.Detach, `detach`, false, `detach from the terminal`)
+	flag.StringVar(&flags.Driver, `driver`, ``, `path to driver`)
+	flag.StringVar(&flags.File, `f`, ``, `path to the yaml spec file`)
+	flag.BoolVar(&flags.Interactive, `i`, false, `enables interactive mode`)
+	flag.BoolVar(&flags.Show, `show`, false, `shows the command to be run`)
+	flag.BoolVar(&flags.Start, `start`, false, `start the pod`)
+	flag.BoolVar(&flags.Stop, `stop`, false, `stop the pod`)
+	flag.BoolVar(&flags.Verbose, `v`, false, ``)
+	flag.BoolVar(&flags.Verbose, `verbose`, false, `turn on extra logging`)
 	flag.Parse()
 
-	driver, err := driver(*flags.Driver)
+	driver, err := driver(flags.Driver)
 	if err != nil {
 		fatal(`driver: %s`, err)
 	}
 
 	var spec Spec
-	if *flags.File != `` {
-		file, err := os.Open(*flags.File)
+	if flags.File != `` {
+		file, err := os.Open(flags.File)
 		if err != nil {
 			fatal(`%s`, err)
 		}
@@ -70,14 +75,18 @@ func main() {
 		}
 	}
 
+	if flags.Bliss && spec.Name != nil {
+		bliss(flags, driver, spec)
+	}
+
 	cmd := []string{driver}
 	switch {
-	case *flags.Start:
+	case flags.Start:
 		cmd = append(cmd, `run`)
-		if *flags.Interactive {
+		if flags.Interactive {
 			cmd = append(cmd, []string{`--interactive`, `--tty`}...)
 		}
-		cmd = addBool(cmd, `detach`, flags.Detach)
+		cmd = addBool(cmd, `detach`, &flags.Detach)
 		cmd = addBool(cmd, `rm`, spec.Rm)
 		cmd = addBool(cmd, `replace`, spec.Replace)
 		cmd = addString(cmd, `name`, spec.Name)
@@ -97,7 +106,7 @@ func main() {
 		}
 		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
-	case *flags.Stop:
+	case flags.Stop:
 		cmd = append(cmd, `stop`)
 		if spec.Name == nil || *spec.Name == `` {
 			if len(flag.Args()) <= 0 {
@@ -108,9 +117,10 @@ func main() {
 		cmd = append(cmd, *spec.Name)
 	}
 
-	if *flags.Show {
+	if flags.Show || flags.Verbose {
 		fmt.Println(strings.Join(cmd, ` `))
-	} else {
+	}
+	if !flags.Show {
 		if err := syscall.Exec(driver, cmd, os.Environ()); err != nil {
 			fatal(`exec: %s`, err)
 		}
@@ -149,6 +159,30 @@ func driver(given string) (string, error) {
 		}
 	}
 	return ``, fmt.Errorf(`driver not found`)
+}
+
+func bliss(flags Flags, driver string, spec Spec) {
+	cmd := []string{driver, `rm`, *spec.Name}
+	if flags.Verbose {
+		fmt.Println(strings.Join(cmd, ` `))
+	}
+	if flags.Show {
+		return
+	}
+	pid, err := syscall.ForkExec(driver, cmd, &syscall.ProcAttr{
+		Env:   os.Environ(),
+		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd()},
+	})
+	if err != nil {
+		fmt.Printf("bliss: exec: %s\n", err)
+		return
+	}
+	var status syscall.WaitStatus
+	var rusage syscall.Rusage
+	_, err = syscall.Wait4(pid, &status, 0, &rusage)
+	if err != nil {
+		fmt.Printf("bliss: wait: %s\n", err)
+	}
 }
 
 func addBool(target []string, option string, condition *bool) []string {
