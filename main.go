@@ -143,34 +143,9 @@ func driver(given string) (string, error) {
 	if given != `` {
 		return given, nil
 	}
-	var paths []string
-	var env = os.Getenv(`PATH`)
-	if index := strings.Index(env, `:`); index < 0 {
-		paths = []string{env}
-	} else {
-		paths = strings.Split(env, `:`)
-	}
-	for _, path := range paths {
-		if path == `` {
-			continue
-		}
-		if path[len(path)-1] != '/' {
-			path += `/`
-		}
-		for _, bin := range []string{`podman`, `docker`} {
-			target := path + bin
-			info, err := os.Stat(target)
-			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
-				return ``, err
-			}
-			if info.IsDir() {
-				continue
-			}
-			// FIXME: check if we can execute it
-			return target, nil
+	for _, bin := range []string{`podman`, `docker`} {
+		if path, err := exec.LookPath(bin); err == nil {
+			return path, nil
 		}
 	}
 	return ``, fmt.Errorf(`driver not found`)
