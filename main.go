@@ -11,24 +11,25 @@ import (
 )
 
 type Spec struct {
-	Args       []string `json:"args"`
-	Dns        []string `json:"dns"`
-	Entrypoint *string  `json:"entrypoint"`
-	Env        []string `json:"env"`
-	EnvFile    *string  `json:"envfile"`
-	Image      *string  `json:"image"`
-	Hostname   *string  `json:"hostname"`
-	Hosts      []string `json:"hosts"`
-	Name       *string  `json:"name"`
-	Network    *string  `json:"network"`
-	Publish    []string `json:"publish"`
-	Replace    *bool    `json:"replace"`
-	Rm         *bool    `json:"rm"`
-	Volumes    []string `json:"volumes"`
+	Args       []string `json:"args" yaml:"args"`
+	Dns        []string `json:"dns" yaml:"dns"`
+	Entrypoint *string  `json:"entrypoint" yaml:"entrypoint"`
+	Env        []string `json:"env" yaml:"env"`
+	EnvFile    *string  `json:"envfile" yaml:"envfile"`
+	Image      *string  `json:"image" yaml:"image"`
+	Hostname   *string  `json:"hostname" yaml:"hostname"`
+	Hosts      []string `json:"hosts" yaml:"hosts"`
+	Name       *string  `json:"name" yaml:"name"`
+	Network    *string  `json:"network" yaml:"network"`
+	Publish    []string `json:"publish" yaml:"publish"`
+	ReadOnly   *bool    `json:"readonly" yaml:"readonly"`
+	Replace    *bool    `json:"replace" yaml:"replace"`
+	Rm         *bool    `json:"rm" yaml:"rm"`
+	Volumes    []string `json:"volumes" yaml:"volumes"`
 	Caps       struct {
-		Add  []string `json:"add"`
-		Drop []string `json:"drop"`
-	} `json:"caps"`
+		Add  []string `json:"add" yaml:"add"`
+		Drop []string `json:"drop" yaml:"drop"`
+	} `json:"caps" yaml:"caps"`
 }
 
 type Flags struct {
@@ -75,8 +76,12 @@ func main() {
 		}
 	}
 
-	if flags.Bliss && spec.Name != nil {
-		bliss(flags, driver, spec)
+	if flags.Bliss {
+		err := bliss(flags, driver, spec)
+		if err != nil {
+			fatal(`bliss: %s`, err.Error())
+		}
+		return
 	}
 
 	cmd := []string{driver}
@@ -98,6 +103,7 @@ func main() {
 		cmd = addSlice(cmd, `dns`, spec.Dns)
 		cmd = addString(cmd, `env-file`, spec.EnvFile)
 		cmd = addSlice(cmd, `env`, spec.Env)
+		cmd = addBool(cmd, `read-only`, spec.ReadOnly)
 		cmd = addSlice(cmd, `publish`, spec.Publish)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
 		cmd = addString(cmd, `entrypoint`, spec.Entrypoint)
@@ -115,6 +121,9 @@ func main() {
 			spec.Name = &flag.Args()[0]
 		}
 		cmd = append(cmd, *spec.Name)
+	default:
+		flag.Usage()
+		fatal(`no command given; provide one of: -start or -stop`)
 	}
 
 	if flags.Show || flags.Verbose {
@@ -139,6 +148,9 @@ func driver(given string) (string, error) {
 		paths = strings.Split(env, `:`)
 	}
 	for _, path := range paths {
+		if path == `` {
+			continue
+		}
 		if path[len(path)-1] != '/' {
 			path += `/`
 		}
@@ -161,28 +173,35 @@ func driver(given string) (string, error) {
 	return ``, fmt.Errorf(`driver not found`)
 }
 
-func bliss(flags Flags, driver string, spec Spec) {
+func bliss(flags Flags, driver string, spec Spec) error {
+	if spec.Name == nil || *spec.Name == `` {
+		return fmt.Errorf("")
+		if len(flag.Args()) <= 0 {
+			return fmt.Errorf(`name required`)
+		}
+		spec.Name = &flag.Args()[0]
+	}
 	cmd := []string{driver, `rm`, *spec.Name}
 	if flags.Verbose {
 		fmt.Println(strings.Join(cmd, ` `))
 	}
 	if flags.Show {
-		return
+		return nil
 	}
 	pid, err := syscall.ForkExec(driver, cmd, &syscall.ProcAttr{
 		Env:   os.Environ(),
 		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd()},
 	})
 	if err != nil {
-		fmt.Printf("bliss: exec: %s\n", err)
-		return
+		return fmt.Errorf(`exec: %w`, err)
 	}
 	var status syscall.WaitStatus
 	var rusage syscall.Rusage
 	_, err = syscall.Wait4(pid, &status, 0, &rusage)
 	if err != nil {
-		fmt.Printf("bliss: wait: %s\n", err)
+		return fmt.Errorf(`wait: %w`, err)
 	}
+	return nil
 }
 
 func addBool(target []string, option string, condition *bool) []string {
@@ -207,6 +226,6 @@ func addString(target []string, option string, value *string) []string {
 }
 
 func fatal(format string, args ...any) {
-	fmt.Println(fmt.Sprintf(format, args...))
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
 }
