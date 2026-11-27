@@ -123,7 +123,7 @@ func main() {
 		cmd = addSlice(cmd, `publish`, spec.Publish)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
 		if spec.Entrypoint != nil {
-			cmd = append(cmd, `entrypoint=`+*spec.Entrypoint)
+			cmd = append(cmd, `--entrypoint=`+*spec.Entrypoint)
 		}
 		cmd = append(cmd, *spec.Image)
 		cmd = append(cmd, spec.Args...)
