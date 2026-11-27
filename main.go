@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -188,18 +191,17 @@ func bliss(flags Flags, driver string, spec Spec) error {
 	if flags.Show {
 		return nil
 	}
-	pid, err := syscall.ForkExec(driver, cmd, &syscall.ProcAttr{
-		Env:   os.Environ(),
-		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd()},
-	})
-	if err != nil {
-		return fmt.Errorf(`exec: %w`, err)
-	}
-	var status syscall.WaitStatus
-	var rusage syscall.Rusage
-	_, err = syscall.Wait4(pid, &status, 0, &rusage)
-	if err != nil {
-		return fmt.Errorf(`wait: %w`, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	runner := exec.CommandContext(ctx, driver, cmd...)
+	runner.Stdin = os.Stdin
+	runner.Stdout = os.Stdout
+	runner.Stderr = os.Stderr
+
+	if err := runner.Run(); err != nil {
+		return fmt.Errorf(`run: %w`, err)
 	}
 	return nil
 }
