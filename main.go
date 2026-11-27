@@ -127,7 +127,9 @@ func main() {
 		cmd = addBool(cmd, `read-only`, spec.ReadOnly)
 		cmd = addSlice(cmd, `publish`, spec.Publish)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
-		cmd = addString(cmd, `entrypoint`, spec.Entrypoint)
+		if spec.Entrypoint != nil {
+			cmd = append(cmd, `entrypoint=`+*spec.Entrypoint)
+		}
 		cmd = append(cmd, *spec.Image)
 		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
@@ -189,8 +191,13 @@ func bliss(flags Flags, driver string, spec Spec) error {
 }
 
 func addBool(target []string, option string, condition *bool) []string {
-	if condition != nil && *condition {
-		target = append(target, `--`+option)
+	if condition == nil {
+		return target
+	}
+	if *condition {
+		target = append(target, `--`+option+`=true`)
+	} else {
+		target = append(target, `--`+option+`=false`)
 	}
 	return target
 }
