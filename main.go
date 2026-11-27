@@ -28,6 +28,7 @@ type Spec struct {
 	ReadOnly   *bool    `json:"readonly" yaml:"readonly"`
 	Replace    *bool    `json:"replace" yaml:"replace"`
 	Rm         *bool    `json:"rm" yaml:"rm"`
+	TmpFs      *string  `json:"tmpfs" yaml:"tmpfs"`
 	Volumes    []string `json:"volumes" yaml:"volumes"`
 	Caps       struct {
 		Add  []string `json:"add" yaml:"add"`
@@ -131,6 +132,7 @@ func main() {
 		cmd = addSlice(cmd, `env`, spec.Env)
 		cmd = addBool(cmd, `read-only`, spec.ReadOnly)
 		cmd = addSlice(cmd, `publish`, spec.Publish)
+		cmd = addString(cmd, `tmpfs`, spec.TmpFs)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
 		if spec.Entrypoint != nil {
 			cmd = append(cmd, `--entrypoint=`+*spec.Entrypoint)
