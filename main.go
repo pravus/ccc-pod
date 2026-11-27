@@ -155,7 +155,6 @@ func driver(given string) (string, error) {
 
 func bliss(flags Flags, driver string, spec Spec) error {
 	if spec.Name == nil || *spec.Name == `` {
-		return fmt.Errorf("")
 		if len(flag.Args()) <= 0 {
 			return fmt.Errorf(`name required`)
 		}
@@ -172,7 +171,7 @@ func bliss(flags Flags, driver string, spec Spec) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	runner := exec.CommandContext(ctx, driver, cmd...)
+	runner := exec.CommandContext(ctx, driver, cmd[1:]...)
 	runner.Stdin = os.Stdin
 	runner.Stdout = os.Stdout
 	runner.Stderr = os.Stderr
