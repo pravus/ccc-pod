@@ -65,6 +65,9 @@ func main() {
 	if flags.Start && flags.Stop {
 		fatal(`ambiguous operations: only provide one of -start or -stop`)
 	}
+	if flags.Stop && flags.Bliss {
+		fatal(`-bliss is only supported with -start`)
+	}
 
 	driver, err := driver(flags.Driver)
 	if err != nil {
@@ -77,9 +80,14 @@ func main() {
 		if err != nil {
 			fatal(`%s`, err)
 		}
-		defer file.Close()
-		if err := yaml.NewDecoder(file).Decode(&spec); err != nil {
+		decoder := yaml.NewDecoder(file)
+		decoder.KnownFields(true)
+		if err := decoder.Decode(&spec); err != nil {
+			_ = file.Close()
 			fatal(`yaml: %s`, err)
+		}
+		if err := file.Close(); err != nil {
+			fatal(`close: %s`, err)
 		}
 	}
 
@@ -107,7 +115,9 @@ func main() {
 		if flags.Interactive {
 			cmd = append(cmd, []string{`--interactive`, `--tty`}...)
 		}
-		cmd = addBool(cmd, `detach`, &flags.Detach)
+		if flags.Detach {
+			cmd = append(cmd, `--detach`)
+		}
 		cmd = addBool(cmd, `rm`, spec.Rm)
 		cmd = addBool(cmd, `replace`, spec.Replace)
 		cmd = addString(cmd, `name`, spec.Name)
@@ -128,6 +138,10 @@ func main() {
 		cmd = append(cmd, *spec.Image)
 		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
+
+		if err := run(flags, driver, cmd); err != nil {
+			fatal(`run: %s`, err.Error())
+		}
 	case flags.Stop:
 		if spec.Name == nil || *spec.Name == `` {
 			if len(flag.Args()) <= 0 {
@@ -135,27 +149,16 @@ func main() {
 			}
 			spec.Name = &flag.Args()[0]
 		}
-		if flags.Bliss {
-			err := bliss(flags, driver, *spec.Name)
-			if err != nil {
-				fatal(`bliss: %s`, err.Error())
-			}
-		}
 
 		cmd = append(cmd, `stop`)
 		cmd = append(cmd, *spec.Name)
+
+		if err := run(flags, driver, cmd); err != nil {
+			fatal(`run: %s`, err.Error())
+		}
 	default:
 		flag.Usage()
 		fatal(`no operation given; provide one of -start or -stop`)
-	}
-
-	if flags.Show || flags.Verbose {
-		show(cmd)
-	}
-	if !flags.Show {
-		if err := syscall.Exec(driver, cmd, os.Environ()); err != nil {
-			fatal(`exec: %s`, err)
-		}
 	}
 }
 
@@ -177,7 +180,7 @@ func driver(given string) (string, error) {
 
 func bliss(flags Flags, driver string, name string) error {
 	cmd := []string{driver, `rm`, name}
-	if flags.Verbose {
+	if flags.Verbose || flags.Show {
 		show(cmd)
 	}
 	if flags.Show {
@@ -187,13 +190,34 @@ func bliss(flags Flags, driver string, name string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
+	var stderr strings.Builder
 	runner := exec.CommandContext(ctx, driver, cmd[1:]...)
 	runner.Stdin = os.Stdin
 	runner.Stdout = os.Stdout
-	runner.Stderr = os.Stderr
+	runner.Stderr = &stderr
 
 	if err := runner.Run(); err != nil {
+		msg := strings.ToLower(stderr.String())
+		if strings.Contains(msg, `no such container`) {
+			return nil
+		}
+		if stderr.Len() > 0 {
+			fmt.Fprint(os.Stderr, stderr.String())
+		}
 		return fmt.Errorf(`run: %w`, err)
+	}
+	return nil
+}
+
+func run(flags Flags, driver string, cmd []string) error {
+	if flags.Show || flags.Verbose {
+		show(cmd)
+	}
+	if flags.Show {
+		return nil
+	}
+	if err := syscall.Exec(driver, cmd, os.Environ()); err != nil {
+		return fmt.Errorf(`exec: %s`, err)
 	}
 	return nil
 }
