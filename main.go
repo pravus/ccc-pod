@@ -143,7 +143,11 @@ func main() {
 
 func driver(given string) (string, error) {
 	if given != `` {
-		return given, nil
+		path, err := exec.LookPath(given)
+		if err != nil {
+			return ``, fmt.Errorf(`path lookup: %w`, err)
+		}
+		return path, nil
 	}
 	for _, bin := range []string{`podman`, `docker`} {
 		if path, err := exec.LookPath(bin); err == nil {
