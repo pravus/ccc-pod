@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -224,14 +225,11 @@ func addString(target []string, option string, value *string) []string {
 }
 
 func show(cmd []string) {
-	line := ``
-	for i, text := range cmd {
-		if i != 0 {
-			line += ` `
-		}
-		line += fmt.Sprintf(`%q`, text)
+	quoted := make([]string, len(cmd))
+	for i := range cmd {
+		quoted[i] = fmt.Sprintf(`%q`, cmd[i])
 	}
-	fmt.Println(line)
+	fmt.Println(strings.Join(quoted, ` `))
 }
 
 func fatal(format string, args ...any) {
