@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 
@@ -62,6 +61,10 @@ func main() {
 	flag.BoolVar(&flags.Verbose, `verbose`, false, `turn on extra logging`)
 	flag.Parse()
 
+	if flags.Start && flags.Stop {
+		fatal(`ambiguous operations: only provide one of -start or -stop`)
+	}
+
 	driver, err := driver(flags.Driver)
 	if err != nil {
 		fatal(`driver: %s`, err)
@@ -84,7 +87,6 @@ func main() {
 		if err != nil {
 			fatal(`bliss: %s`, err.Error())
 		}
-		return
 	}
 
 	cmd := []string{driver}
@@ -126,11 +128,11 @@ func main() {
 		cmd = append(cmd, *spec.Name)
 	default:
 		flag.Usage()
-		fatal(`no command given; provide one of: -start or -stop`)
+		fatal(`no operation given; provide one of -start or -stop`)
 	}
 
 	if flags.Show || flags.Verbose {
-		fmt.Println(strings.Join(cmd, ` `))
+		show(cmd)
 	}
 	if !flags.Show {
 		if err := syscall.Exec(driver, cmd, os.Environ()); err != nil {
@@ -161,7 +163,7 @@ func bliss(flags Flags, driver string, spec Spec) error {
 	}
 	cmd := []string{driver, `rm`, *spec.Name}
 	if flags.Verbose {
-		fmt.Println(strings.Join(cmd, ` `))
+		show(cmd)
 	}
 	if flags.Show {
 		return nil
@@ -200,6 +202,17 @@ func addString(target []string, option string, value *string) []string {
 		target = append(target, `--`+option+`=`+*value)
 	}
 	return target
+}
+
+func show(cmd []string) {
+	line := ``
+	for i, text := range cmd {
+		if i != 0 {
+			line += ` `
+		}
+		line += fmt.Sprintf(`%q`, text)
+	}
+	fmt.Println(line)
 }
 
 func fatal(format string, args ...any) {
