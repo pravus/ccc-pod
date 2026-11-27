@@ -82,30 +82,24 @@ func main() {
 		}
 	}
 
-	if flags.Bliss || flags.Stop {
-		if spec.Name == nil || *spec.Name == `` {
-			if len(flag.Args()) <= 0 {
-				fatal(`-name required`)
-			}
-			spec.Name = &flag.Args()[0]
-		}
-	}
-
-	if flags.Bliss {
-		err := bliss(flags, driver, spec)
-		if err != nil {
-			fatal(`bliss: %s`, err.Error())
-		}
-	}
-
 	cmd := []string{driver}
 	switch {
 	case flags.Start:
 		if flags.File == `` {
-			fatal(`pod specification required for -start`)
+			fatal(`pod specification required for start operation`)
 		}
 		if spec.Image == nil || *spec.Image == `` {
-			fatal(`image is required in pod specification for -start`)
+			fatal(`image is required in pod specification for start operation`)
+		}
+
+		if flags.Bliss {
+			if spec.Name == nil || *spec.Name == `` {
+				fatal(`container name required when using -bliss for start operation`)
+			}
+			err := bliss(flags, driver, *spec.Name)
+			if err != nil {
+				fatal(`bliss: %s`, err.Error())
+			}
 		}
 
 		cmd = append(cmd, `run`)
@@ -134,6 +128,19 @@ func main() {
 		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
 	case flags.Stop:
+		if spec.Name == nil || *spec.Name == `` {
+			if len(flag.Args()) <= 0 {
+				fatal(`container name required for stop operation`)
+			}
+			spec.Name = &flag.Args()[0]
+		}
+		if flags.Bliss {
+			err := bliss(flags, driver, *spec.Name)
+			if err != nil {
+				fatal(`bliss: %s`, err.Error())
+			}
+		}
+
 		cmd = append(cmd, `stop`)
 		cmd = append(cmd, *spec.Name)
 	default:
@@ -167,8 +174,8 @@ func driver(given string) (string, error) {
 	return ``, fmt.Errorf(`driver not found`)
 }
 
-func bliss(flags Flags, driver string, spec Spec) error {
-	cmd := []string{driver, `rm`, *spec.Name}
+func bliss(flags Flags, driver string, name string) error {
+	cmd := []string{driver, `rm`, name}
 	if flags.Verbose {
 		show(cmd)
 	}
