@@ -82,6 +82,15 @@ func main() {
 		}
 	}
 
+	if flags.Bliss || flags.Stop {
+		if spec.Name == nil || *spec.Name == `` {
+			if len(flag.Args()) <= 0 {
+				fatal(`-name required`)
+			}
+			spec.Name = &flag.Args()[0]
+		}
+	}
+
 	if flags.Bliss {
 		err := bliss(flags, driver, spec)
 		if err != nil {
@@ -119,12 +128,6 @@ func main() {
 		cmd = append(cmd, flag.Args()...)
 	case flags.Stop:
 		cmd = append(cmd, `stop`)
-		if spec.Name == nil || *spec.Name == `` {
-			if len(flag.Args()) <= 0 {
-				fatal(`name required`)
-			}
-			spec.Name = &flag.Args()[0]
-		}
 		cmd = append(cmd, *spec.Name)
 	default:
 		flag.Usage()
@@ -158,12 +161,6 @@ func driver(given string) (string, error) {
 }
 
 func bliss(flags Flags, driver string, spec Spec) error {
-	if spec.Name == nil || *spec.Name == `` {
-		if len(flag.Args()) <= 0 {
-			return fmt.Errorf(`name required`)
-		}
-		spec.Name = &flag.Args()[0]
-	}
 	cmd := []string{driver, `rm`, *spec.Name}
 	if flags.Verbose {
 		show(cmd)
