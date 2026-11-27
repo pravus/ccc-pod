@@ -101,6 +101,13 @@ func main() {
 	cmd := []string{driver}
 	switch {
 	case flags.Start:
+		if flags.File == `` {
+			fatal(`pod specification required for -start`)
+		}
+		if spec.Image == nil || *spec.Image == `` {
+			fatal(`image is required in pod specification for -start`)
+		}
+
 		cmd = append(cmd, `run`)
 		if flags.Interactive {
 			cmd = append(cmd, []string{`--interactive`, `--tty`}...)
@@ -121,9 +128,7 @@ func main() {
 		cmd = addSlice(cmd, `publish`, spec.Publish)
 		cmd = addSlice(cmd, `volume`, spec.Volumes)
 		cmd = addString(cmd, `entrypoint`, spec.Entrypoint)
-		if spec.Image != nil && *spec.Image != `` {
-			cmd = append(cmd, *spec.Image)
-		}
+		cmd = append(cmd, *spec.Image)
 		cmd = append(cmd, spec.Args...)
 		cmd = append(cmd, flag.Args()...)
 	case flags.Stop:
